@@ -1,2 +1,9 @@
 *.csv
 *.db
+/Archive/
+*.txt
+*.log
+*.json
+*.xml
+*.zip
+*.pdf
