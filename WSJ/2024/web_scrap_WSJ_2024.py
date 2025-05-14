@@ -1,3 +1,16 @@
+"""
+WSJ Full Article Content Scraper  
+---------------------------------
+- Uses undetected ChromeDriver to scrape full article content (corpus) from WSJ.  
+- Loads article links from the `articles_index` table and saves content to `article` table.  
+- Extracts article headline (h1), subheadline (h2), and full text from different HTML containers.  
+- Uses an existing logged-in Chrome profile to bypass paywalls.  
+- Avoids scraping articles from irrelevant categories.  
+- Updates the database to mark processed articles and avoid duplicates.  
+- Adjustable daily limits and randomized delays to mimic human behavior.  
+"""
+
+# === Imports ===
 import os
 import time
 import random
@@ -8,21 +21,24 @@ import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
-class Search4Articles_leftover:
+
+# === WSJ Article Scraper Class ===
+class Search4Articles:
     def __init__(self, db_name='articlesWSJ.db'):
+        # Initialize base URL and database path
         self.url = "https://www.wsj.com/"
         self.db_name = db_name
 
-        # Chrome user profile path
-        self.user_data_dir = "C:/Users/PC/AppData/Local/Google/Chrome/User Data"
-        self.profile_dir = "Profile 1"
+        # Chrome user profile for logged-in session (required for paywall access)
+        self.user_data_dir = ""
+        self.profile_dir = ""
 
-        # Start browser
+        # Initialize web driver and link column index in DB
         self.driver = self.create_driver()
-        self.link_index = 7  # column index of the URL in the DB rows
+        self.link_index = 7
 
     def create_driver(self):
-        # Create undetected Chrome driver with user profile
+        # Create a Chrome driver session with specified user profile
         options = uc.ChromeOptions()
         options.add_argument(f"--user-data-dir={self.user_data_dir}")
         options.add_argument(f"--profile-directory={self.profile_dir}")
@@ -33,7 +49,7 @@ class Search4Articles_leftover:
         return driver
 
     def get_webpages_links(self, n_web):
-        # Retrieve unscanned article links from the database
+        # Retrieve n_web random links from the database where scanned_status = 0
         conn = sqlite3.connect(self.db_name)
         c = conn.cursor()
         c.execute("SELECT * FROM articles_index WHERE scanned_status = 0")
@@ -48,7 +64,7 @@ class Search4Articles_leftover:
             return []
 
     def should_exclude_link(self, url):
-        # Filter out links that belong to unwanted categories
+        # Filter out irrelevant categories based on URL keywords
         exclude_keywords = [
             "health", "arts-culture", "lifestyle", "real-estate", "sports", 
             "livecoverage", "personal-finance", "video", "science", 
@@ -57,7 +73,7 @@ class Search4Articles_leftover:
         return any(f"/{keyword}/" in url or url.startswith(f"https://www.wsj.com/{keyword}") for keyword in exclude_keywords)
 
     def get_corpus(self):
-        # Extract the article headline, subtitle, and main text
+        # Try to extract headline (h1), subheadline (h2), and article content
         try:
             h1 = self.driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
         except NoSuchElementException:
@@ -88,7 +104,7 @@ class Search4Articles_leftover:
         return h1, h2, content
 
     def insert_elements(self, elements):
-        # Save the extracted article content into the database
+        # Insert extracted article content into the DB if valid
         if not elements['corpus'] or elements['corpus'] == 'not found':
             print(f"⚠️ No valid content – Skipping article {elements['index_id']}.")
             return
@@ -108,7 +124,7 @@ class Search4Articles_leftover:
             print(f"Database error: {e}")
 
     def navigation(self, max_per_day=30, year=None, month=None, day=None):
-        # Loop through dates and scrape up to max_per_day articles per day
+        # Navigate through dates and scrape articles based on remaining targets
         if year is not None and month is not None and day is not None:
             dates = [(year, month, day)]
         else:
@@ -123,8 +139,34 @@ class Search4Articles_leftover:
             dates = c.fetchall()
             conn.close()
 
+        for y, m, d in dates:
+            ymd = f"{int(y)}-{int(m):02d}-{int(d):02d}"
+            print(f"\n📆 {ymd}: Scraping up to {max_per_day} articles")
+
+            # Check how many articles have already been collected for this date
+            conn = sqlite3.connect(self.db_name)
+            c = conn.cursor()
+            c.execute("""
+                SELECT COUNT(DISTINCT a.article_id)
+                FROM article a
+                JOIN articles_index ai ON ai.id = a.index_id
+                WHERE ai.year = ? AND ai.month = ? AND ai.day = ?
+                AND a.corpus IS NOT NULL 
+                AND a.corpus != '' 
+                AND a.corpus != 'not found'
+            """, (y, m, d))
+            count_existing = c.fetchone()[0]
+            conn.close()
+
+            print(f"🔍 DB says we have {count_existing} valid articles for {ymd}")
+
+            if count_existing >= max_per_day:
+                print(f"✅ Already have {count_existing} articles – skipping.")
+                continue
+
             remaining = max_per_day - count_existing
 
+            # Fetch remaining articles that haven't been scanned yet
             conn = sqlite3.connect(self.db_name)
             c = conn.cursor()
             c.execute("""
@@ -147,7 +189,7 @@ class Search4Articles_leftover:
 
                 print(f"➡️ Opening article {idx}: {link}")
                 self.driver.get(link)
-                time.sleep(random.uniform(3, 7))
+                time.sleep(random.uniform(3, 7))  # Random delay to simulate human behavior
 
                 h1, h2, content = self.get_corpus()
                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -161,4 +203,4 @@ class Search4Articles_leftover:
                 })
 
                 print("✅ Article saved\n")
-                time.sleep(random.uniform(2, 5))
+                time.sleep(random.uniform(2, 5))  # Short cooldown before next article

@@ -1,12 +1,30 @@
+"""
+WSJ Missing Data Recovery Script  
+---------------------------------
+- Identifies dates with incomplete article coverage based on a CSV of missing days.  
+- Step 1 (Optional): Scrapes missing article links using WebScrap.  
+- Step 2: Downloads full article content using Search4Articles (headless browser).  
+- Ensures database completeness by targeting days with fewer than `MAX_ARTICLES_PER_DAY` valid articles.  
+- Requires: 
+    - missing_dates.csv (list of dates to check)
+    - articlesWSJ_final_clean_2024.db (final database)  
+"""
+
 import time
 import pandas as pd
 import sqlite3
-from scrape_missing_days_WSJ import WebScrap
+from scrape_missing_days_WSJ_2024 import WebScrap
+
+# Dynamically add the parent directory to sys.path
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
 from web_scrap_WSJ import Search4Articles
 
 # === Paths ===
-DB_PATH = r"C:\Users\PC\Desktop\Masterarbeit\Code\WSJ\articlesWSJ_final_clean.db"
-CSV_PATH = r"C:\Users\PC\Desktop\Masterarbeit\Code\WSJ\missing_dates_filtered_after_2024-09-30.csv"
+DB_PATH = r"articlesWSJ_final_clean_2024.db"
+CSV_PATH = r"missing_dates.csv"
 
 # === Config switches ===
 RUN_SCRAPE_LINKS = False
