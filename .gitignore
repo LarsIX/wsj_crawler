@@ -1,9 +1,12 @@
 *.csv
 *.db
 /Archive/
+/Annotation/
+/DB/
 *.txt
 *.log
 *.json
 *.xml
 *.zip
 *.pdf
+/2023/  

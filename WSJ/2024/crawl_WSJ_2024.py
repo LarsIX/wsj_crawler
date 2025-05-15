@@ -1,17 +1,3 @@
-"""
-WSJ Article Link Crawler  
--------------------------
-- Crawls and stores WSJ article metadata (links, headlines, keywords, timestamps) for a given year.  
-- Saves collected metadata into a SQLite database (`articles_index` table).  
-- Skips already explored pages and handles pagination.  
-- Stores exploration logs to prevent redundant crawling (`exploration` table).  
-- Requires: 
-    - Valid WSJ archive URLs (scraping based on archive structure).
-    - Pre-existing SQLite database `articlesWSJ.db` with correct table schemas.
-
-This script ONLY collects article metadata and links. Full content scraping must be done separately.
-"""
-
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -57,7 +43,7 @@ class ManagementDB():
         self.conn.close()
 
 # Web crawler for collecting WSJ article metadata
-class WebScrap:
+class WebCrawl:
     def __init__(self):
         self.page_number = 1
         self.total_articles = 0
@@ -189,7 +175,7 @@ def get_dates(year):
 # Entry point for scraping a full year
 def searching(year, waiting_time):
     dates = get_dates(year)
-    scrap = WebScrap()
+    scrap = WebCrawl()
     for day, month, year in dates:
         print(f"📅 Processing: {day}-{month}-{year}")
         scrap.get_elements_from_web(year, month, day, waiting_time)
